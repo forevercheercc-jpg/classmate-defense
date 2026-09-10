@@ -24,3 +24,6 @@ docs/itch/launcher-preview.png
 
 # Backup do .git original (fork do autor)
 .git.upstream.bak/
+
+# Temp: workflows precisam de token scope workflow
+.github/workflows/
