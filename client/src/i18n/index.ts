@@ -1,28 +1,38 @@
-// Sistema de i18n leve: inglês como padrão, PT-BR como tradução, extensível.
+// Sistema de i18n leve. 同学局版：简体中文为默认语言，
+// 英文为规范源（canônico），PT-BR 保留作为对照。
 import { useSyncExternalStore } from 'react';
 import { getCard } from '@claude-royale/shared';
 import { en } from './en';
 import { ptBR } from './pt-BR';
+import { zh } from './zh';
 
-export type Locale = 'en' | 'pt-BR';
+export type Locale = 'zh' | 'en' | 'pt-BR';
 export type Dict = typeof en;
 
-const DICTS: Record<Locale, Dict> = { en, 'pt-BR': ptBR };
+const DICTS: Record<Locale, Dict> = { zh, en, 'pt-BR': ptBR };
 const STORAGE_KEY = 'claude-royale:lang';
 export const LOCALES: { id: Locale; label: string; flag: string }[] = [
+  { id: 'zh', label: '简体中文', flag: '🇨🇳' },
   { id: 'en', label: 'English', flag: '🇺🇸' },
   { id: 'pt-BR', label: 'Português', flag: '🇧🇷' },
 ];
 
+function isLocale(value: string | null): value is Locale {
+  return value === 'zh' || value === 'en' || value === 'pt-BR';
+}
+
 function detectLocale(): Locale {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'en' || saved === 'pt-BR') return saved;
+    if (isLocale(saved)) return saved;
   } catch {
     // storage indisponível
   }
-  const nav = (navigator.language || 'en').toLowerCase();
-  return nav.startsWith('pt') ? 'pt-BR' : 'en';
+  const nav = (navigator.language || '').toLowerCase();
+  if (nav.startsWith('pt')) return 'pt-BR';
+  // 默认简体中文（同学局版）—— 只有明确的英文环境才回落英文
+  if (nav.startsWith('en')) return 'en';
+  return 'zh';
 }
 
 let current: Locale = detectLocale();

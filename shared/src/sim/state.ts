@@ -494,6 +494,8 @@ export function spawnMob(
     action: 'idle',
     facing: -1,
     mobVariant: variant,
+    // 派系跟随任务书 3.9，供 M3 的克制/易伤计算使用
+    element: stats.element,
     lane,
   };
   state.entities[id] = entity;
@@ -505,6 +507,11 @@ export function spawnMob(
     side: 'right',
   });
   return entity;
+}
+
+/** 怪物中文名（任务书 3.9），用于 HUD / 击杀提示 */
+export function mobName(variant: MobVariant): string {
+  return MOB_STATS[variant]?.name ?? variant;
 }
 
 /** 取出当前波次定义（state.wave 1-based；越界返回 undefined） */

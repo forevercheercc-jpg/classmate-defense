@@ -3,6 +3,8 @@
 export const GRID_W = 32;
 export const GRID_H = 18;
 
+import type { Element } from './types';
+
 // Rio vertical no centro da arena, atravessável apenas pelas pontes.
 export const RIVER_MIN_X = 15;
 export const RIVER_MAX_X = 17;
@@ -102,21 +104,41 @@ export const DEFENSE_BATTLE_SECONDS = 150; // 单局约 2.5 分钟
 // 后续接入英雄/技能（M3）时再换 cards 体系。
 // ============================================================
 
-/** 怪物种类（M0 简化：单一一档近战怪，留作变量便于 M3 扩展元素派系） */
-export type MobVariant = 'horde' | 'ogre' | 'imp';
+/**
+ * 怪物种类 —— 命名与派系取自需求文档 3.9「技能与怪物命名」。
+ * M0 先做 4 只基础怪（覆盖冰霜/自然/火焰/暗影 4 系）；
+ * 神圣系不出怪（作为玩家反制派系），奥术系留到 M3。
+ */
+export type MobVariant = 'murloc' | 'kobold' | 'imp' | 'skeleton';
 
-/** 简化怪物基础属性表（近战、单位一格大小） */
-export const MOB_STATS: Record<MobVariant, {
+export interface MobDef {
+  /** 中文名（任务书 3.9） */
+  name: string;
+  /** 派系（任务书 3.8 六派系） */
+  element: Element;
+  /** 定位（任务书 3.9） */
+  role: string;
   hp: number;
   damage: number;
-  range: number;       // 命中半径（M0 一律近战 = TOWER_RADIUS）
+  range: number;       // 命中半径（M0 一律近战）
   hitSpeed: number;    // 两次攻击间隔（秒）
   speed: number;       // tiles/s
   sight: number;       // 警戒/搜索半径
-}> = {
-  horde: { hp:  60, damage:  8, range: 0.5, hitSpeed: 0.7, speed: 2.2, sight: 0.5 },
-  ogre:  { hp: 180, damage: 22, range: 0.5, hitSpeed: 1.0, speed: 1.4, sight: 0.5 },
-  imp:   { hp:  30, damage:  4, range: 0.5, hitSpeed: 0.55, speed: 2.8, sight: 0.5 },
+}
+
+export const MOB_STATS: Record<MobVariant, MobDef> = {
+  // 鱼人：冰霜，快、成群 —— 血薄数量多
+  murloc:   { name: '鱼人',     element: 'frost',  role: '快、成群',
+              hp: 45, damage: 7,  range: 0.5, hitSpeed: 0.60, speed: 2.6, sight: 0.5 },
+  // 狗头人：自然，最弱炮灰
+  kobold:   { name: '狗头人',   element: 'nature', role: '最弱炮灰',
+              hp: 30, damage: 4,  range: 0.5, hitSpeed: 0.55, speed: 2.4, sight: 0.5 },
+  // 小鬼：火焰，高爆 —— 血薄但伤害高
+  imp:      { name: '小鬼',     element: 'fire',   role: '高爆',
+              hp: 55, damage: 14, range: 0.5, hitSpeed: 0.90, speed: 2.0, sight: 0.5 },
+  // 骷髅士兵：暗影，难缠（亡者复生：死后复活一次 —— M0 未实现，M3 补）
+  skeleton: { name: '骷髅士兵', element: 'shadow', role: '难缠·亡者复生',
+              hp: 90, damage: 10, range: 0.5, hitSpeed: 0.80, speed: 1.7, sight: 0.5 },
 };
 
 /** M0 简化波次：8 波线性递增、每条路都刷 */
@@ -133,11 +155,12 @@ function buildM0Waves(): DefenseWaveDef[] {
   const waves: DefenseWaveDef[] = [];
   for (let i = 0; i < DEFENSE_WAVE_COUNT; i++) {
     const w = i + 1;
-    // 1-3 波 horde；4-6 ogre；7-8 imp+ogre 混合（M0 简化先用纯 ogre 测稳定）
+    // 1-2 波狗头人（炮灰）→ 3-4 波鱼人（成群）→ 5-6 波小鬼（高爆）→ 7-8 波骷髅（难缠）
     let variant: MobVariant;
-    if (w <= 2) variant = 'horde';
-    else if (w <= 5) variant = 'imp';
-    else variant = 'ogre';
+    if (w <= 2) variant = 'kobold';
+    else if (w <= 4) variant = 'murloc';
+    else if (w <= 6) variant = 'imp';
+    else variant = 'skeleton';
     const ramp = 1 + (w - 1) * 0.18;
     waves.push({
       wave: w,

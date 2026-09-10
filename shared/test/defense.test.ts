@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
-  CORE_HP, CORE_POS, DEFENSE_BATTLE_SECONDS, LANE_COUNT, POINT_HP,
+  CORE_HP, CORE_POS, LANE_COUNT, MOB_STATS, POINT_HP,
   POINT_YS, POINTS_PER_LANE, TICK_DT, WAVE_BREAK_SECONDS, WAVES_M0,
 } from '../src/constants';
 import { createInitialState, spawnMob } from '../src/sim/state';
@@ -113,12 +113,29 @@ describe('M0 防守模式', () => {
 
   test('spawnMob 生成的怪物有 mobVariant、hpScale 缩放', () => {
     const state = createInitialState({ defense: true });
-    const e = spawnMob(state, 0, 'ogre', 1.5, 1);
-    expect(e.mobVariant).toBe('ogre');
-    expect(e.hp).toBe(Math.round(180 * 1.5));
+    const e = spawnMob(state, 0, 'skeleton', 1.5, 1);
+    expect(e.mobVariant).toBe('skeleton');
+    expect(e.hp).toBe(Math.round(90 * 1.5));
     expect(e.side).toBe('right');
     expect(e.kind).toBe('unit');
     expect(e.lane).toBe(0);
+  });
+
+  test('怪物命名与派系符合任务书 3.9', () => {
+    // 鱼人=冰霜、狗头人=自然、小鬼=火焰、骷髅士兵=暗影
+    expect(MOB_STATS.murloc.name).toBe('鱼人');
+    expect(MOB_STATS.murloc.element).toBe('frost');
+    expect(MOB_STATS.kobold.name).toBe('狗头人');
+    expect(MOB_STATS.kobold.element).toBe('nature');
+    expect(MOB_STATS.imp.name).toBe('小鬼');
+    expect(MOB_STATS.imp.element).toBe('fire');
+    expect(MOB_STATS.skeleton.name).toBe('骷髅士兵');
+    expect(MOB_STATS.skeleton.element).toBe('shadow');
+
+    const state = createInitialState({ defense: true });
+    // 派系要写进实体，供 M3 克制计算
+    expect(spawnMob(state, 1, 'murloc', 1, 1).element).toBe('frost');
+    expect(spawnMob(state, 1, 'imp', 1, 1).element).toBe('fire');
   });
 
   test('8 波刷完后强制结束（玩家撑住 = 赢）', () => {

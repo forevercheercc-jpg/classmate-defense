@@ -224,9 +224,9 @@ function BattleTab({
               className="play-button secondary defense"
               disabled={connecting}
               onClick={() => onPlay({ mode: 'defense' })}
-              title="3 路波次防守（同学局 M0 测试版）"
+              title={t('defense.modeName')}
             >
-              🛡️ 防守 PVE
+              {t('home.defensePVE')}
             </button>
           </div>
           <div className="difficulty-picker" role="radiogroup" aria-label={t('home.botDifficulty')}>
