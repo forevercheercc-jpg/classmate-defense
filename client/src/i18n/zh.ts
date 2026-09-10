@@ -3,7 +3,10 @@
 // 防守模式怪物名来自 shared/constants.ts 的 MOB_STATS（已中文）。
 import type { Dict } from './index';
 
-export const zh: Dict = {
+/** 卡牌名/描述的中译（英文原文来自 shared/cards.ts）。 */
+export type CardDict = Record<string, { name: string; desc: string }>;
+
+export const zh: Dict & { cards: CardDict } = {
   common: {
     battle: '开始战斗',
     connecting: '连接中…',
@@ -236,5 +239,58 @@ export const zh: Dict = {
     mobs: {
       murloc: '鱼人', kobold: '狗头人', imp: '小鬼', skeleton: '骷髅士兵',
     },
+  },
+  // ===== 卡牌名/描述（50 张，英文原文来自 shared/cards.ts） =====
+  cards: {
+    flechas: { name: '齐射', desc: '大范围箭雨覆盖，造成轻微伤害。' },
+    bombardeiro: { name: '掷弹兵', desc: '投掷炸弹造成范围爆炸，无法攻击空中目标。' },
+    arqueiras: { name: '弓箭手', desc: '一对全能射手，可对空对地。' },
+    cavaleiro: { name: '哨兵', desc: '坚韧的低价战士。每使用 2 次，下一次进化登场（护盾 + 额外生命）。' },
+    lanceiros: { name: '长矛手', desc: '脆弱的三人组，向空中和地面投掷长矛。' },
+    salteadores: { name: '刺客', desc: '三名持匕首的迅捷盗贼。' },
+    esqueletos: { name: '骷髅兵', desc: '便宜、脆弱，很适合用来引开敌人。' },
+    morcegos: { name: '夜翼蝠', desc: '迅捷的飞行三人组，见谁咬谁。' },
+    canhao: { name: '轰击炮', desc: '廉价防御，只攻击地面目标。' },
+    barbaros: { name: '突袭者', desc: '持斧的四人小队，很硬。没有溅射很难清掉。' },
+    bobina: { name: '电弧塔', desc: '电击塔，可对空对地。' },
+    nuvemDeMorcegos: { name: '蝠群', desc: '六只饥饿的蝙蝠遮天蔽日。' },
+    choque: { name: '电击', desc: '瞬间放电，造成轻微伤害并眩晕 0.5 秒。' },
+    morteiro: { name: '远程迫击炮', desc: '射程极远，射速缓慢。' },
+    bolaDeFogo: { name: '陨石', desc: '燃烧弹，在中等范围造成大量伤害。' },
+    executor: { name: '掠夺者', desc: '对单体造成毁灭性打击。就费用而言较脆。' },
+    mosqueteira: { name: '神射手', desc: '精准远程射击，可对空对地。' },
+    gigante: { name: '巨无霸', desc: '移动的山岳，无视部队直捣建筑。' },
+    postoDeLanceiros: { name: '长矛哨站', desc: '存续期间不时征召一名长矛手。' },
+    valquiria: { name: '盾女', desc: '旋转飞斧，横扫周围一切。' },
+    ossuario: { name: '骨坑', desc: '周期性召唤骷髅；倒塌时释放最后一波。' },
+    torreBombas: { name: '爆破塔', desc: '坚固防御，向地面部队投掷范围炸弹。' },
+    foguete: { name: '火箭弹幕', desc: '小范围内造成残酷伤害。花之前先瞄准。' },
+    acampamento: { name: '战争营地', desc: '每波训练两名突袭者。' },
+    torreDeChamas: { name: '烈焰塔', desc: '持续喷射，用速射融化坦克。' },
+    javali: { name: '冲锋野猪', desc: '直奔建筑，可任意位置跳过河流。' },
+    mago: { name: '奥术师', desc: '对任意目标发射范围火球。' },
+    pocoDeElixir: { name: '魔力井', desc: '投资型建筑：存续期间产出额外能量。' },
+    curandeira: { name: '治疗师', desc: '不攻击：持续治疗附近友军的光环。' },
+    principe: { name: '先锋', desc: '冲锋一段距离后，下一击造成双倍伤害。' },
+    dragaozinho: { name: '幼龙', desc: '飞行并吐出范围火焰。均衡且难以针对。' },
+    legiaoDeOssos: { name: '白骨军团', desc: '一次十只骷髅，人海淹没任何单体目标。' },
+    bruxa: { name: '唤骨者', desc: '轻微范围攻击，前进时召唤骷髅。' },
+    relampago: { name: '雷霆一击', desc: '三道闪电击中区域内生命值最高的敌人，并附带眩晕。' },
+    barrilSurpresa: { name: '伏击木桶', desc: '可投向竞技场任意位置；刺客破桶而出。' },
+    carregadorDeBomba: { name: '炸弹搬运工', desc: '以建筑为目标，死亡时投下巨型炸弹。' },
+    dirigivel: { name: '飞艇', desc: '越过一切飞向防御塔；坠落时投下炸弹。' },
+    furia: { name: '狂怒', desc: '激怒区域内友军：移动与攻击更快。' },
+    balestra: { name: '弩炮', desc: '巨型弩，射程夸张、射速极高。' },
+    congelamento: { name: '冰封', desc: '冻结区域内敌人数秒。不造成伤害。' },
+    colosso: { name: '战争破坏者', desc: '缓慢、昂贵，但每一击都极其致命。' },
+    espelho: { name: '回响', desc: '重复你上一张打出的卡，费用 +1。' },
+    golem: { name: '巨石像', desc: '石头巨像，死亡时裂成两片。' },
+    guardiaoRunico: { name: '符文卫士', desc: '符文护盾在生命值之前吸收伤害。先破盾。' },
+    laminaFaminta: { name: '嗜血之刃', desc: '每次命中吸取生命，击杀时自我恢复。' },
+    nevoaVenenosa: { name: '毒雾', desc: '留下毒云，8 秒内腐蚀区域内一切。' },
+    trollRegenerante: { name: '永生巨魔', desc: '持续回复生命。要么速杀，要么别杀。' },
+    campeaValente: { name: '黎明之刃', desc: '英雄单位，主动技能「壁垒」可举起护盾并激怒自身数秒。每套卡组最多 1 名英雄。' },
+    mestreDasTempestades: { name: '风暴守望者', desc: '远程英雄，技能「风暴」对周围造成范围伤害并治疗自身。每套卡组最多 1 名英雄。' },
+    fragmentoDeGolem: { name: '石片', desc: '被摧毁巨像的一块活体碎片。' },
   },
 };

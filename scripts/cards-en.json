@@ -1,0 +1,252 @@
+[
+  {
+    "id": "flechas",
+    "name": "Volley",
+    "desc": "A wide salvo of arrows peppers a large area for light damage."
+  },
+  {
+    "id": "bombardeiro",
+    "name": "Grenadier",
+    "desc": "Lobs bombs that burst in an area. Can't hit air."
+  },
+  {
+    "id": "arqueiras",
+    "name": "Bowmaidens",
+    "desc": "A versatile pair of shooters that hit air and ground."
+  },
+  {
+    "id": "cavaleiro",
+    "name": "Sentinel",
+    "desc": "A tough, cheap warrior. Every 2 plays the next comes EVOLVED (shield + extra HP)."
+  },
+  {
+    "id": "lanceiros",
+    "name": "Pikers",
+    "desc": "A fragile trio that throws spears at air and ground."
+  },
+  {
+    "id": "salteadores",
+    "name": "Cutthroats",
+    "desc": "Three fast rogues with sharp daggers."
+  },
+  {
+    "id": "esqueletos",
+    "name": "Bonekin",
+    "desc": "Cheap, fragile and great for distraction."
+  },
+  {
+    "id": "morcegos",
+    "name": "Nightwings",
+    "desc": "A fast flying trio that bites anything."
+  },
+  {
+    "id": "canhao",
+    "name": "Bombard",
+    "desc": "Cheap defense that fires on ground targets."
+  },
+  {
+    "id": "barbaros",
+    "name": "Raiders",
+    "desc": "A tough axe-wielding quartet. Hard to clear without splash."
+  },
+  {
+    "id": "bobina",
+    "name": "Arc Coil",
+    "desc": "An electric tower that zaps air and ground."
+  },
+  {
+    "id": "nuvemDeMorcegos",
+    "name": "Nightswarm",
+    "desc": "Half a dozen hungry bats darken the sky."
+  },
+  {
+    "id": "choque",
+    "name": "Jolt",
+    "desc": "An instant discharge for light damage and a half-second stun."
+  },
+  {
+    "id": "morteiro",
+    "name": "Longshot",
+    "desc": "Very long-range artillery with a slow cadence."
+  },
+  {
+    "id": "bolaDeFogo",
+    "name": "Meteor",
+    "desc": "A flaming projectile with heavy damage in a medium area."
+  },
+  {
+    "id": "executor",
+    "name": "Reaver",
+    "desc": "Devastating blows to a single target. Fragile for the cost."
+  },
+  {
+    "id": "mosqueteira",
+    "name": "Sharpshooter",
+    "desc": "A precise long-range shot against air and ground."
+  },
+  {
+    "id": "gigante",
+    "name": "Juggernaut",
+    "desc": "A walking mountain that ignores troops and smashes buildings."
+  },
+  {
+    "id": "postoDeLanceiros",
+    "name": "Pike Outpost",
+    "desc": "Recruits a piker now and then while it lasts."
+  },
+  {
+    "id": "valquiria",
+    "name": "Shieldmaiden",
+    "desc": "A spinning axe that hits everything around her."
+  },
+  {
+    "id": "ossuario",
+    "name": "Bonepit",
+    "desc": "Raises skeletons periodically; releases a final wave when it crumbles."
+  },
+  {
+    "id": "torreBombas",
+    "name": "Blast Keep",
+    "desc": "A sturdy defense that lobs area bombs at ground troops."
+  },
+  {
+    "id": "foguete",
+    "name": "Barrage",
+    "desc": "Brutal damage in a small area. Aim well before spending."
+  },
+  {
+    "id": "acampamento",
+    "name": "War Camp",
+    "desc": "Trains a pair of raiders each wave."
+  },
+  {
+    "id": "torreDeChamas",
+    "name": "Pyre Tower",
+    "desc": "A continuous jet that melts tanks with rapid-fire bursts."
+  },
+  {
+    "id": "javali",
+    "name": "Charger",
+    "desc": "Gallops straight to buildings and leaps the river anywhere."
+  },
+  {
+    "id": "mago",
+    "name": "Arcanist",
+    "desc": "Area fireballs against any target."
+  },
+  {
+    "id": "pocoDeElixir",
+    "name": "Mana Well",
+    "desc": "An investment: produces extra elixir while it survives."
+  },
+  {
+    "id": "curandeira",
+    "name": "Mender",
+    "desc": "Doesn't attack: emits an aura that continuously heals nearby allies."
+  },
+  {
+    "id": "principe",
+    "name": "Vanguard",
+    "desc": "After charging a distance, the next hit deals double damage."
+  },
+  {
+    "id": "dragaozinho",
+    "name": "Wyrmling",
+    "desc": "Flies and breathes area fire. Balanced and hard to punish."
+  },
+  {
+    "id": "legiaoDeOssos",
+    "name": "Bone Legion",
+    "desc": "Ten skeletons at once. Drowns any single target."
+  },
+  {
+    "id": "bruxa",
+    "name": "Bonecaller",
+    "desc": "Light area attack that raises skeletons as it advances."
+  },
+  {
+    "id": "relampago",
+    "name": "Thunderstrike",
+    "desc": "Three bolts strike the HIGHEST-HP enemies in the area, with a stun."
+  },
+  {
+    "id": "barrilSurpresa",
+    "name": "Ambush Barrel",
+    "desc": "Throws a barrel ANYWHERE in the arena; cutthroats spill out."
+  },
+  {
+    "id": "carregadorDeBomba",
+    "name": "Bombhauler",
+    "desc": "Targets buildings and drops a huge bomb on death."
+  },
+  {
+    "id": "dirigivel",
+    "name": "Zeppelin",
+    "desc": "Flies over everything toward the towers; drops a bomb when it falls."
+  },
+  {
+    "id": "furia",
+    "name": "Frenzy",
+    "desc": "Enrages allies in the area: faster movement and attack."
+  },
+  {
+    "id": "balestra",
+    "name": "Ballista",
+    "desc": "A giant crossbow with absurd range and very high cadence."
+  },
+  {
+    "id": "congelamento",
+    "name": "Frostbind",
+    "desc": "Freezes enemies in the area for a few seconds. Deals no damage."
+  },
+  {
+    "id": "colosso",
+    "name": "Warbreaker",
+    "desc": "Slow, costly and absolutely devastating blow by blow."
+  },
+  {
+    "id": "espelho",
+    "name": "Echo",
+    "desc": "Repeats the last card you played, for +1 elixir."
+  },
+  {
+    "id": "golem",
+    "name": "Monolith",
+    "desc": "A stone colossus that splits into two shards on death."
+  },
+  {
+    "id": "guardiaoRunico",
+    "name": "Runeguard",
+    "desc": "A runic shield absorbs damage before HP. Break it first."
+  },
+  {
+    "id": "laminaFaminta",
+    "name": "Bloodblade",
+    "desc": "Steals HP on every hit and restores itself on kills."
+  },
+  {
+    "id": "nevoaVenenosa",
+    "name": "Venom Cloud",
+    "desc": "Leaves a toxic cloud that corrodes everything in the area for 8 seconds."
+  },
+  {
+    "id": "trollRegenerante",
+    "name": "Everliving Troll",
+    "desc": "Regenerates HP nonstop. Kill it fast or never."
+  },
+  {
+    "id": "campeaValente",
+    "name": "Dawnblade",
+    "desc": "Champion with an active ability: Bulwark raises a shield and enrages her for a few seconds. Max 1 champion per deck."
+  },
+  {
+    "id": "mestreDasTempestades",
+    "name": "Storm Warden",
+    "desc": "Ranged champion. Ability: Tempest deals area damage around him and heals him. Max 1 champion per deck."
+  },
+  {
+    "id": "fragmentoDeGolem",
+    "name": "Stone Shard",
+    "desc": "A living piece of a destroyed golem."
+  }
+]
