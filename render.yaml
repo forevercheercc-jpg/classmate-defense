@@ -1,0 +1,23 @@
+# Render Blueprint — 同学局防守 server
+# 使用方法：在 Render Dashboard 选 "New + Blueprint"，连 GitHub 选本仓库即自动部署
+# 冷启动约 30s（free plan）
+services:
+  - type: web
+    name: classmate-defense-server
+    runtime: docker
+    plan: free
+    # 沿用仓库根的 server/Dockerfile（fly.toml 兼容结构）
+    dockerfilePath: ./server/Dockerfile
+    dockerContext: .
+    # Colyseus 默认端口（Render 会自动注入 PORT env，server 已用 process.env.PORT 兜底）
+    envVars:
+      - key: PORT
+        value: '2567'
+      - key: NODE_ENV
+        value: production
+    # 健康检查用 leaderboard 端点（与 fly.toml 思路一致）
+    healthCheckPath: /leaderboard
+    # Singapore 离中国大陆最近；fallback 用 Oregon
+    region: singapore
+    # 自动部署：master 推代码即重新构建
+    autoDeploy: true

@@ -1,8 +1,10 @@
-# Deploy automático do servidor no Fly.io a cada push que toca o backend.
+# Deploy do servidor no Fly.io (não é mais usado; Render é o padrão agora).
+# Mantido para migração futura. Trigger manual: Actions → Deploy server → Run workflow.
 # Requer o secret FLY_API_TOKEN (Fly dashboard → Tokens → Deploy token).
-name: Deploy server
+name: Deploy server (Fly.io legacy)
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
     paths:
@@ -10,11 +12,11 @@ on:
       - 'shared/**'
       - 'fly.toml'
       - 'pnpm-lock.yaml'
-  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     concurrency: fly-deploy
     steps:
       - uses: actions/checkout@v7
