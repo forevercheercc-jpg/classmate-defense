@@ -1,0 +1,26 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+server/data/
+
+# Sprites Tiny Swords: a licença proíbe redistribuição.
+# Rode tools/fetch-assets.ps1 para baixá-los após clonar.
+client/public/assets/tiny-swords/*
+!client/public/assets/tiny-swords/CREDITS.md
+
+# UI Synty (Interface Fantasy Menus): pack pago, sem redistribuição.
+# Copie da sua compra com tools/fetch-assets.ps1 (seção Synty) após clonar.
+client/public/assets/ui/*
+!client/public/assets/ui/CREDITS.md
+
+# Artefatos dos scripts e2e
+tools/e2e/*.png
+
+# Artefatos gerados do itch (capa/zip regerados localmente)
+docs/itch/*.jpg
+docs/itch/*.zip
+docs/itch/launcher-preview.png
+
+# Backup do .git original (fork do autor)
+.git.upstream.bak/

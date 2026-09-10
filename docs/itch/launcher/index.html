@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Claude Royale</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Trebuchet MS', system-ui, sans-serif;
+    background:
+      radial-gradient(circle at 50% 30%, #1c2a4a 0%, #0c1220 60%, #070b14 100%);
+    color: #f5e9c9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+  }
+  .wrap { padding: 24px; max-width: 620px; animation: rise 0.6s ease both; }
+  .crown { font-size: clamp(52px, 12vw, 92px); filter: drop-shadow(0 6px 14px rgba(0,0,0,.6)); }
+  h1 {
+    font-size: clamp(34px, 8vw, 62px);
+    letter-spacing: 1px;
+    margin: 4px 0 6px;
+    color: #ffd75e;
+    text-shadow: 0 3px 0 #6b4e00, 0 10px 26px rgba(0,0,0,.7);
+  }
+  p.tag { font-size: clamp(14px, 3.2vw, 19px); color: #cfd8ee; margin-bottom: 26px; line-height: 1.5; }
+  a.play {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 16px 34px; border-radius: 14px; text-decoration: none;
+    font-size: clamp(18px, 4vw, 24px); font-weight: 700; color: #2a1c00;
+    background: linear-gradient(180deg, #ffe27a, #f5b301);
+    box-shadow: 0 6px 0 #9a6b00, 0 14px 30px rgba(0,0,0,.5);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  a.play:hover { transform: translateY(-2px); box-shadow: 0 8px 0 #9a6b00, 0 18px 34px rgba(0,0,0,.55); }
+  a.play:active { transform: translateY(3px); box-shadow: 0 3px 0 #9a6b00, 0 8px 18px rgba(0,0,0,.5); }
+  .note { margin-top: 20px; font-size: 13px; color: #8fa1c4; line-height: 1.5; }
+  .feat { margin-top: 26px; display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: center; font-size: 13px; color: #b9c6e2; }
+  .feat span { background: rgba(255,255,255,.06); padding: 5px 11px; border-radius: 999px; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="crown">👑</div>
+    <h1>Claude Royale</h1>
+    <p class="tag">Real-time 1v1 Clash Royale-style battles in your browser.<br />Fullscreen, landscape — best on a phone held sideways.</p>
+    <a class="play" href="https://clauderoyale.net" target="_blank" rel="noopener">▶ Play now</a>
+    <div class="feat">
+      <span>⚔️ Real-time multiplayer</span>
+      <span>🃏 49 cards</span>
+      <span>🤖 Train vs bots</span>
+      <span>📱 Free · no install</span>
+    </div>
+    <p class="note">Opens at <strong>clauderoyale.net</strong> in a new tab for true fullscreen &amp; landscape.<br />Play with a friend: open in two tabs (or two phones) and battle.<br /><a href="https://discord.gg/CCnKH4XBmy" target="_blank" rel="noopener" style="color:#8ea1ff;text-decoration:none;">💬 Join the Discord</a></p>
+  </div>
+  <script>
+    // Botão principal já abre em nova aba. Reforço: clique em qualquer lugar do fundo também abre.
+    document.body.addEventListener('click', function (e) {
+      if (e.target.closest('a')) return;
+      window.open('https://clauderoyale.net', '_blank', 'noopener');
+    });
+  </script>
+</body>
+</html>

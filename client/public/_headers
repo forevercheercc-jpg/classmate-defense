@@ -1,0 +1,11 @@
+# Headers servidos pelo Cloudflare Pages (https://developers.cloudflare.com/pages/configuration/headers/)
+
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+
+# Bundles do Vite (hash no nome) e assets do jogo
+/assets/*
+  Cache-Control: public, max-age=86400

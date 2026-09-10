@@ -1,0 +1,36 @@
+name: ✨ Feature request
+description: Suggest a new card, mechanic, mode or improvement
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What would you like to see in the game?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it makes the game better
+      description: What problem does it solve or what fun does it add?
+    validations:
+      required: true
+  - type: dropdown
+    id: type
+    attributes:
+      label: Type
+      options:
+        - New card / champion / evolution
+        - Game mode
+        - Balance change
+        - UI / UX
+        - Infrastructure / tooling
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: balance
+    attributes:
+      label: Balance considerations (for cards)
+      description: Suggested cost, stats, counters. Simulator output (`pnpm --filter @claude-royale/server balance`) is a plus.

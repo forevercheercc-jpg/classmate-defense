@@ -1,0 +1,46 @@
+name: 🐛 Bug report
+description: Something broke in the game or the server
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Clear description of the bug. For gameplay bugs, the room code and what cards were involved help a lot.
+      placeholder: The Giant walked through the river instead of using the bridge...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start Train vs Bot (hard)
+        2. Play Giant at the river edge
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Gameplay / simulation
+        - Client rendering (Phaser)
+        - UI (React)
+        - Networking / rooms (Colyseus)
+        - Audio
+        - PWA / mobile
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device & browser
+      placeholder: iPhone 15, Safari 19 / Windows 11, Chrome 138
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console logs / screenshots
+      description: Paste any errors from the browser console or attach screenshots.

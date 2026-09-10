@@ -1,0 +1,23 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-e-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Majors de npm sao migrados manualmente (Phaser 4, Colyseus etc.)
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+      # Colyseus versiona como 0.x: bump "minor" (0.16->0.17) e BREAKING
+      # (quebrou o matchmaking em producao em 2026-07-16). Migrar manualmente.
+      - dependency-name: 'colyseus'
+        update-types: ['version-update:semver-minor']
+      - dependency-name: '@colyseus/*'
+        update-types: ['version-update:semver-minor']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
