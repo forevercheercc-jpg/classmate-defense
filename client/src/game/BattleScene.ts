@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { Room } from 'colyseus.js';
-import { getCard, gridToScreen } from '@claude-royale/shared';
+import { CORE_HP, GRID_H, LANE_XS, getCard, gridToScreen } from '@claude-royale/shared';
 import type { SimEvent } from '@claude-royale/shared';
 import { drawArena, drawDeployZone, drawDropPreview, type ArenaTheme } from './arena';
 import { ambient } from './ambient';
@@ -182,98 +182,90 @@ export class BattleScene extends Phaser.Scene {
    * - 监听 room.state 增量更新 HUD
    */
   private setupDefenseOverlay(): void {
-    import('@claude-royale/shared').then(({ LANE_XS, POINT_YS, CORE_POS, CORE_RADIUS,
-                                            POINT_RADIUS, CORE_HP }) => {
-      const laneGfx = this.add.graphics();
-      laneGfx.setDepth(-500);
+    // --- 3 条进攻路线：从顶部（远）到底部（核心）各画一条色带 ---
+    const laneGfx = this.add.graphics();
+    laneGfx.setDepth(-500);
+    const LANE_COLORS = [0xff5a5a, 0xff9c3a, 0x5ac5ff];
+    LANE_XS.forEach((cx, i) => {
+      const top = gridToScreen(cx, 0);
+      const bot = gridToScreen(cx, GRID_H);
+      const color = LANE_COLORS[i] ?? 0xffffff;
+      laneGfx.fillStyle(color, 0.06);
+      laneGfx.fillRect(top.x - 50, top.y, 100, bot.y - top.y);
+      laneGfx.lineStyle(2, color, 0.5);
+      laneGfx.lineBetween(top.x, top.y, bot.x, bot.y);
+      this.add.text(top.x - 16, top.y - 18, `L${i + 1}`, {
+        fontSize: '14px', color: '#ffffff',
+      }).setDepth(100);
+    });
 
-      // 3 条 lane 中央亮带 + 浅色通道
-      const laneCols = [0xff5a5a, 0xff9c3a, 0x5ac5ff];
-      for (let i = 0; i < LANE_XS.length; i++) {
-        const cx = LANE_XS[i]!;
-        const top = gridToScreen(cx, 0);
-        const bot = gridToScreen(cx, GRID_H);
-        laneGfx.fillStyle(laneCols[i]!, 0.06);
-        laneGfx.fillRect(top.x - 50, top.y, 100, bot.y - top.y);
-        laneGfx.lineStyle(2, laneCols[i]!, 0.5);
-        laneGfx.lineBetween(cx + 0, top.y, cx + 0, bot.y);
-        // 起讫标签
-        this.add.text(top.x - 16, top.y - 18, `L${i + 1}`, {
-          fontSize: '14px', color: '#ffffff',
-        }).setDepth(100);
-      }
-
-      // 9 个点位 + 1 个核心 highlight（按 entity state 的实际位置）
-      const pointsGfx = this.add.graphics();
-      pointsGfx.setDepth(-400);
-      const updatePoints = () => {
-        pointsGfx.clear();
-        for (const [, ent] of Object.entries(this.room.state.entities)) {
-          const e = ent as Record<string, unknown>;
-          if (e.kind !== 'tower' || e.side !== 'left') continue;
-          const p = gridToScreen(Number(e.x), Number(e.y));
-          const isCore = e.tower === 'king';
-          const r = isCore ? CORE_RADIUS : POINT_RADIUS;
-          const scale = isCore ? 1.5 : 1.0;
-          const sp = gridToScreen(Number(e.x), Number(e.y));
-          const tw = this.cameras.main.scaleManager.zoom;
-          // 用 sp 转屏幕坐标（gridToScreen 输出已含 phaser scale 因子）
-          void r; void scale; void tw;
-          if (isCore) {
-            pointsGfx.fillStyle(0xffd54f, 0.7);
-            pointsGfx.fillCircle(sp.x, sp.y, 14);
-            pointsGfx.lineStyle(2, 0xffd54f, 0.9);
-            pointsGfx.strokeCircle(sp.x, sp.y, 18);
-          } else {
-            const alive = (e.hp as number) > 0;
-            pointsGfx.fillStyle(alive ? 0x80cbc4 : 0x555555, alive ? 0.55 : 0.3);
-            pointsGfx.fillCircle(sp.x, sp.y, 8);
-            pointsGfx.lineStyle(1, alive ? 0x4db6ac : 0x888888, 0.9);
-            pointsGfx.strokeCircle(sp.x, sp.y, 10);
-          }
+    // --- 点位 / 核心高亮：跟随 entities 实时位置刷新 ---
+    const pointsGfx = this.add.graphics();
+    pointsGfx.setDepth(-400);
+    const updatePoints = (): void => {
+      pointsGfx.clear();
+      this.room.state.entities.forEach((ent: unknown) => {
+        const e = ent as {
+          kind: string; side: string; tower: string; x: number; y: number; hp: number;
+        };
+        if (e.kind !== 'tower' || e.side !== 'left') return;
+        const p = gridToScreen(e.x, e.y);
+        if (e.tower === 'king') {
+          // 核心：金色大圆
+          pointsGfx.fillStyle(0xffd54f, 0.7);
+          pointsGfx.fillCircle(p.x, p.y, 14);
+          pointsGfx.lineStyle(2, 0xffd54f, 0.9);
+          pointsGfx.strokeCircle(p.x, p.y, 18);
+        } else {
+          // 点位：青色小圆，失守变灰
+          const alive = e.hp > 0;
+          pointsGfx.fillStyle(alive ? 0x80cbc4 : 0x555555, alive ? 0.55 : 0.3);
+          pointsGfx.fillCircle(p.x, p.y, 8);
+          pointsGfx.lineStyle(1, alive ? 0x4db6ac : 0x888888, 0.9);
+          pointsGfx.strokeCircle(p.x, p.y, 10);
         }
+      });
+    };
+    updatePoints();
+
+    // --- 顶部 HUD：波次 / 倒计时 / 核心血条 ---
+    const hudText = this.add.text(20, 20, '防守模式', {
+      fontSize: '20px', color: '#ffffff', fontStyle: 'bold',
+    }).setDepth(2000);
+    const hudBar = this.add.graphics().setDepth(2000);
+
+    const updateHud = (): void => {
+      const st = this.room.state as unknown as {
+        wave?: number; waveCountdown?: number; coreHp?: number;
+        coreMaxHp?: number; phase?: string; winner?: string;
       };
+      const wave = st.wave ?? 1;
+      const cd = st.waveCountdown ?? 0;
+      const coreHp = st.coreHp ?? 0;
+      const coreMax = st.coreMaxHp ?? CORE_HP;
+      const ended = st.phase === 'ended';
+      const status = ended
+        ? (st.winner === 'left' ? '守住！' : st.winner === 'right' ? '核心失守' : '平局')
+        : `下波 ${cd.toFixed(1)}s`;
+      hudText.setText(`🛡️ Wave ${wave} · ${status} · 核心 ${Math.round(coreHp)}/${Math.round(coreMax)}`);
+
+      const BAR_W = 240, BAR_H = 18, BX = 20, BY = 48;
+      const ratio = coreMax > 0 ? Math.max(0, Math.min(1, coreHp / coreMax)) : 0;
+      hudBar.clear();
+      hudBar.fillStyle(0x000000, 0.6);
+      hudBar.fillRect(BX, BY, BAR_W, BAR_H);
+      hudBar.fillStyle(ratio > 0.4 ? 0x66bb6a : ratio > 0.2 ? 0xffb74d : 0xef5350, 1);
+      hudBar.fillRect(BX, BY, BAR_W * ratio, BAR_H);
+      hudBar.lineStyle(1, 0xffffff, 0.6);
+      hudBar.strokeRect(BX, BY, BAR_W, BAR_H);
+    };
+    updateHud();
+
+    // --- 监听 schema 增量变化 ---
+    this.room.onStateChange(() => {
       updatePoints();
-
-      // HUD 文本 / 进度条（顶部）
-      const hudText = this.add.text(20, 20, '防守模式', {
-        fontSize: '20px', color: '#ffffff',
-        fontStyle: 'bold',
-      }).setDepth(2000);
-      const hudBar = this.add.graphics().setDepth(2000);
-      const updateHud = () => {
-        const st = this.room.state as Record<string, unknown>;
-        const wave = (st.wave as number) ?? 1;
-        const cd = (st.waveCountdown as number) ?? 0;
-        const coreHp = (st.coreHp as number) ?? 0;
-        const coreMax = (st.coreMaxHp as number) ?? CORE_HP;
-        const phase = String(st.phase ?? 'battle');
-        const winner = String(st.winner ?? '');
-        hudText.setText(
-          `🛡️ 防守 · Wave ${wave} · ${phase === 'ended' ? `胜负：${winner || '持平'}` : `下波 ${cd.toFixed(1)}s`} · 核心 ${Math.round(coreHp)}/${Math.round(coreMax)}`,
-        );
-        hudBar.clear();
-        const barW = 240, barH = 18;
-        const px = 20, py = 48;
-        hudBar.fillStyle(0x000000, 0.6);
-        hudBar.fillRect(px, py, barW, barH);
-        const ratio = coreMax > 0 ? Math.max(0, coreHp / coreMax) : 0;
-        hudBar.fillStyle(ratio > 0.4 ? 0x66bb6a : ratio > 0.2 ? 0xffb74d : 0xef5350, 1);
-        hudBar.fillRect(px, py, barW * ratio, barH);
-        hudBar.lineStyle(1, 0xffffff, 0.6);
-        hudBar.strokeRect(px, py, barW, barH);
-      };
       updateHud();
-
-      // 监听 schema state 增量变化
-      const onStateChange = () => {
-        updatePoints();
-        updateHud();
-      };
-      this.room.onStateChange(onStateChange);
-      this.cleanups.push(() => this.room.onStateChange(undefined as any));
-      void POINT_YS; // M1 占位，TODO M2 加点位 boss 焦点动画
-    }).catch((err) => console.error('defense overlay init failed', err));
+    });
   }
 
   private createAnimations(): void {
