@@ -1,9 +1,11 @@
 import {
+  CAMP_DAMAGE, CAMP_HIT_SPEED, CAMP_HP, CAMP_SIGHT, CAMP_SPEED,
   COUNTDOWN_SECONDS, CORE_HP, CORE_POS, DEPLOY_MAX_X_LEFT, DEPLOY_MIN_X_RIGHT,
   DEPLOY_SECONDS, DEFENSE_BATTLE_SECONDS,
-  ELIXIR_MAX, ELIXIR_START, GRID_H, GRID_W, HAND_SIZE, KING_TOWER, LANE_COUNT,
-  LANE_XS, LEFT_KING_POS, LEFT_PRINCESS_POS,
-  MOB_SPAWN_MAX_Y, MOB_SPAWN_Y, MOB_STATS, POINT_BUFF, POINT_HP, POINT_YS,
+  ELIXIR_MAX, ELIXIR_START, GRID_H, GRID_W, HAND_SIZE, JUNGLE_CAMPS, KING_TOWER,
+  LANE_COUNT, LANE_PATHS,
+  LEFT_KING_POS, LEFT_PRINCESS_POS,
+  MOB_SPAWN_JITTER, MOB_STATS, POINT_BUFF, POINT_HP, POINT_POS,
   POINTS_PER_LANE, PRINCESS_TOWER, UNIT_RADIUS, WAVES_M0, WAVE_BREAK_SECONDS,
   mirrorX,
 } from '../constants';
@@ -72,21 +74,22 @@ function createInitialDefenseState(): SimState {
     coreMaxHp: CORE_HP,
   };
 
-  // 9 个点位（每条路：前哨 / 中间 / 核心前）
+  // 9 个点位（每条路：前哨 / 中间 / 核心前），坐标来自 POINT_POS（M1 蜿蜒布局）
   for (let lane = 0; lane < LANE_COUNT; lane++) {
     for (let p = 0; p < POINTS_PER_LANE; p++) {
+      const pos = POINT_POS[lane]?.[p] ?? { x: 20, y: 9 };
       const entity: SimEntity = {
         id: `e${state.nextEntityId++}`,
         kind: 'tower',
         tower: 'princess',
         side: 'left',
-        x: LANE_XS[lane],
-        y: POINT_YS[p],
+        x: pos.x,
+        y: pos.y,
         hp: POINT_HP,
         maxHp: POINT_HP,
         attackCooldown: 0,
         action: 'idle',
-        facing: -1, // 怪物从屏幕下方来袭，tower 朝向是参考
+        facing: -1, // 怪物从右向左来袭
         lane,
         pointIndex: p,
         buff: POINT_BUFF[p],
@@ -110,6 +113,9 @@ function createInitialDefenseState(): SimState {
     facing: -1,
   };
   state.entities[core.id] = core;
+
+  // 野区野怪营地（M1）：常驻，供英雄打野练级
+  spawnJungleCamps(state);
 
   return state;
 }
@@ -462,10 +468,10 @@ function clamp(v: number, min: number, max: number): number {
 }
 
 /**
- * 在防守模式某条路上刷一只怪物。M0 简化：
- * - lane: 0..2 对应 LANE_XS
+ * 在防守模式某条路上刷一只怪物。M1：出生点 = 该路第一个航点（右侧入口）。
+ * - lane: 0..2 对应 LANE_PATHS
  * - hpScale / damageScale 由调用方从波次表传入
- * 出生用确定性抖动（state.tick 派生），可重放。
+ * 出生抖动只作用在 y 上，且由 state.tick 派生，可重放。
  */
 export function spawnMob(
   state: SimState,
@@ -475,19 +481,19 @@ export function spawnMob(
   damageScale: number,
 ): SimEntity {
   const stats = MOB_STATS[variant];
-  // Deterministic jitter 0..1 by tick + lane
-  const j = (Math.sin(state.tick * 0.137 + lane * 7.31) + 1) * 0.5;
-  const xLane = LANE_XS[lane] ?? LANE_XS[1]!;
-  const ySpawn = MOB_SPAWN_Y + j * (MOB_SPAWN_MAX_Y - MOB_SPAWN_Y);
-  const xJitter = (j - 0.5) * 1.6;
+  const path = LANE_PATHS[lane] ?? LANE_PATHS[1]!;
+  const start = path[0]!;
+  // Deterministic jitter -1..1 by tick + lane
+  const j = Math.sin(state.tick * 0.137 + lane * 7.31);
+  const yJitter = j * MOB_SPAWN_JITTER;
 
   const id = `e${state.nextEntityId++}`;
   const entity: SimEntity = {
     id,
     kind: 'unit',
     side: 'right',
-    x: xLane + xJitter,
-    y: ySpawn,
+    x: start.x,
+    y: start.y + yJitter,
     hp: Math.round(stats.hp * hpScale),
     maxHp: Math.round(stats.hp * hpScale),
     attackCooldown: 0,
@@ -497,6 +503,8 @@ export function spawnMob(
     // 派系跟随任务书 3.9，供 M3 的克制/易伤计算使用
     element: stats.element,
     lane,
+    waypointIndex: 1,
+    pathDistance: 0,
   };
   state.entities[id] = entity;
   state.events.push({
@@ -507,6 +515,34 @@ export function spawnMob(
     side: 'right',
   });
   return entity;
+}
+
+/**
+ * 野怪营地（M1）：每个 JUNGLE_CAMPS 生成一只"野怪"，不走波次，常驻野区。
+ * 用 mobVariant='kobold' 复用怪物步进，但战斗数值走 CAMP_* 常量，
+ * 行为差异（只在营地附近游荡、不推进城堡）由 step.ts 的 campIndex 分支处理。
+ */
+export function spawnJungleCamps(state: SimState): void {
+  JUNGLE_CAMPS.forEach((pos, index) => {
+    const id = `e${state.nextEntityId++}`;
+    const entity: SimEntity = {
+      id,
+      kind: 'unit',
+      side: 'right',
+      x: pos.x,
+      y: pos.y,
+      hp: CAMP_HP,
+      maxHp: CAMP_HP,
+      attackCooldown: 0,
+      action: 'idle',
+      facing: -1,
+      mobVariant: 'kobold',
+      element: 'nature',
+      campIndex: index,
+      campRespawn: 0,
+    };
+    state.entities[id] = entity;
+  });
 }
 
 /** 怪物中文名（任务书 3.9），用于 HUD / 击杀提示 */

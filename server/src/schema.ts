@@ -28,6 +28,10 @@ export class EntitySchema extends Schema {
   @type('number') pointIndex = -1;
   /** 防守模式：点位强化倍率（越靠近核心越高） */
   @type('number') buff = 1;
+  /** 防守模式 M1：野怪营地归属索引（-1 = 不是野怪） */
+  @type('number') campIndex = -1;
+  /** 防守模式 M1：是否为肉山 */
+  @type('boolean') isRoshan = false;
 }
 
 export class PlayerSchema extends Schema {
@@ -54,4 +58,10 @@ export class BattleState extends Schema {
   @type('number') waveCountdown = 0;
   @type('number') coreHp = 0;
   @type('number') coreMaxHp = 0;
+  /** M1：肉山状态 0=未苏醒 1=苏醒 2=已击杀 */
+  @type('number') roshanState = 0;
+  /** M1：肉山刷新倒计时（秒） */
+  @type('number') roshanRespawn = 0;
+  /** M1：全队强化 Buff 剩余秒数 */
+  @type('number') teamBuffSeconds = 0;
 }

@@ -26,6 +26,16 @@ export interface SimulationResult {
 const MAX_SECONDS = 300;
 const ALL_CARDS = () => collectionCards().map((card) => card.id);
 
+/**
+ * Checa fim de partida através de uma função (e não de `state.phase !== 'ended'`
+ * inline): o TS estreitaria `state.phase` para o literal atribuído acima e
+ * consideraria a comparação com 'ended' impossível. A indireção preserva o
+ * tipo largo de `phase`.
+ */
+function matchEnded(state: SimState): boolean {
+  return state.phase === 'ended';
+}
+
 function randomDeck(pool: string[]): string[] {
   const copy = [...pool];
   const deck: string[] = [];
@@ -47,7 +57,7 @@ function runMatch(): { winner: string; left: string[]; right: string[] } {
 
   const cooldowns: Record<Side, number> = { left: 0, right: 0 };
   const maxTicks = MAX_SECONDS / TICK_DT;
-  for (let tick = 0; tick < maxTicks && state.phase !== 'ended'; tick++) {
+  for (let tick = 0; tick < maxTicks && !matchEnded(state); tick++) {
     for (const side of ['left', 'right'] as Side[]) {
       cooldowns[side] -= TICK_DT;
       if (cooldowns[side] > 0) continue;

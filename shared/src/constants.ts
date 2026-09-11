@@ -61,24 +61,112 @@ export function mirrorX(x: number): number {
 }
 
 // ============================================================
-// 防守模式（3 路波次防守）—— 同学局改造新增
-// 布局：怪物从远处（y=0，屏幕顶部）沿 3 条纵向走廊向核心
-//       （y=16.5，屏幕底部）推进。复用 2.5D 投影的"上远下近"透视。
+// 防守模式（3 路波次防守）—— 同学局改造 · M1 地图重画
+// 布局参考《帝国守卫战 / Realm Defense》+ Dota 地图体系：
+//   怪物从右侧 3 个入口出发，沿 3 条蜿蜒土路向左推进，
+//   最终在左侧中央的石头城堡前汇流。
+//   路与路之间的空地是野区（野怪营地 / 肉山）。
 // ============================================================
 
-/** 3 条进攻路线：x 方向 左 / 中 / 右 */
-export const LANE_XS = [5.5, 16, 26.5] as const;
 export const LANE_COUNT = 3;
 
-/** 每条路 3 个点位：y 方向由远到近（前哨 / 中间 / 核心前） */
-export const POINT_YS = [4, 8, 12] as const;
+/** 波次节奏 */
+export const DEFENSE_WAVE_COUNT = 8;
+export const WAVE_INTERVAL_SECONDS = 14; // 每波持续
+export const WAVE_BREAK_SECONDS = 4; // 波间喘息
+export const DEFENSE_BATTLE_SECONDS = 480; // 单局约 8 分钟（MOBA-lite：要留打野/肉山时间）
+
+export interface Vec2 {
+  x: number;
+  y: number;
+}
+
+/**
+ * 三条进攻路线的航点（右手 → 左手）。
+ * 每条路 7–8 个航点，在 32×18 网格里来回折弯，避免笔直三条线。
+ * - 上路 lane0：贴上半区，中段向南压
+ * - 中路 lane1：穿过中央，末段绕开肉山坑
+ * - 下路 lane2：贴下半区，中段向北压
+ * 三条路最后 2 个航点收束到城堡前的同一个汇流点。
+ */
+export const LANE_PATHS: ReadonlyArray<ReadonlyArray<Vec2>> = [
+  // 0 — 上路（红）
+  [
+    { x: 32.5, y: 3.4 },
+    { x: 28.2, y: 3.4 },
+    { x: 25.6, y: 4.6 },
+    { x: 22.4, y: 5.2 },
+    { x: 19.5, y: 6.0 },
+    { x: 16.8, y: 7.0 },
+    { x: 14.6, y: 8.0 },
+    { x: 12.6, y: 8.9 },
+    { x: 10.4, y: 9.0 }, // 汇流
+  ],
+  // 1 — 中路（橙）
+  [
+    { x: 32.5, y: 9.0 },
+    { x: 29.0, y: 8.8 },
+    { x: 26.2, y: 9.7 },
+    { x: 23.4, y: 10.6 },
+    { x: 20.6, y: 11.2 },
+    { x: 17.8, y: 11.3 },
+    { x: 15.0, y: 11.0 },
+    { x: 12.6, y: 10.2 },
+    { x: 10.4, y: 9.0 }, // 汇流
+  ],
+  // 2 — 下路（蓝）
+  [
+    { x: 32.5, y: 14.6 },
+    { x: 28.4, y: 14.6 },
+    { x: 25.4, y: 13.6 },
+    { x: 22.6, y: 12.8 },
+    { x: 19.8, y: 12.0 },
+    { x: 17.0, y: 10.6 },
+    { x: 14.2, y: 9.8 },
+    { x: 12.0, y: 9.3 },
+    { x: 10.4, y: 9.0 }, // 汇流
+  ],
+];
+
+/**
+ * 每条路 3 个点位的坐标（前哨 / 中间 / 核心前），紧邻土路外侧。
+ * buff 倍率越靠近城堡越高（见 POINT_BUFF）。
+ * lane0 点位在北侧、lane2 在南侧、lane1 交替，视觉上不重叠。
+ */
+export const POINT_POS: ReadonlyArray<ReadonlyArray<Vec2>> = [
+  // 上路
+  [
+    { x: 28.0, y: 2.1 },
+    { x: 22.6, y: 4.1 },
+    { x: 15.2, y: 6.5 },
+  ],
+  // 中路
+  [
+    { x: 28.2, y: 10.6 },
+    { x: 21.0, y: 12.9 },
+    { x: 14.4, y: 9.0 },
+  ],
+  // 下路
+  [
+    { x: 28.2, y: 16.0 },
+    { x: 22.8, y: 11.0 },
+    { x: 13.4, y: 11.6 },
+  ],
+];
 export const POINTS_PER_LANE = 3;
 
 /** 强化倍率：越靠近核心越高（对应前哨 / 中间 / 核心前） */
 export const POINT_BUFF = [1.0, 1.35, 1.7] as const;
 
-/** 据点核心 */
-export const CORE_POS = { x: 16, y: 16.5 };
+/** 三个进攻入口（怪物出生点），与 LANE_PATHS 首航点一致 */
+export const LANE_SPAWNS: ReadonlyArray<Vec2> = [
+  LANE_PATHS[0]![0]!,
+  LANE_PATHS[1]![0]!,
+  LANE_PATHS[2]![0]!,
+];
+
+/** 据点核心（城堡）：移到左侧中央，三条路的终点 */
+export const CORE_POS = { x: 7.4, y: 9.0 };
 export const CORE_HP = 5000;
 export const CORE_RADIUS = 1.6;
 export const CORE_DAMAGE = 130;
@@ -88,15 +176,59 @@ export const CORE_RANGE = 7;
 export const POINT_HP = 900;
 export const POINT_RADIUS = 1.3;
 
-/** 怪物出生区（顶部远处） */
-export const MOB_SPAWN_Y = 0.5;
-export const MOB_SPAWN_MAX_Y = 2;
+// ---- 野区（打野） ----
 
-/** 波次节奏 */
-export const DEFENSE_WAVE_COUNT = 8;
-export const WAVE_INTERVAL_SECONDS = 14; // 每波持续
-export const WAVE_BREAK_SECONDS = 4; // 波间喘息
-export const DEFENSE_BATTLE_SECONDS = 150; // 单局约 2.5 分钟
+/**
+ * 两片丛林野区，位于路与路之间的空地。
+ * 野区内有野怪营地；击杀后延迟刷新（给英雄练级）。
+ */
+export interface JungleArea {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const JUNGLE_AREAS: ReadonlyArray<JungleArea> = [
+  { x: 19.5, y: 4.4, w: 7.0, h: 2.6 },  // 上半野区（上路↔中路之间）
+  { x: 19.0, y: 11.6, w: 7.5, h: 2.6 }, // 下半野区（中路↔下路之间）
+];
+
+/** 野怪营地坐标（每个野区 2 个） */
+export const JUNGLE_CAMPS: ReadonlyArray<Vec2> = [
+  { x: 21.0, y: 5.7 },
+  { x: 25.2, y: 5.7 },
+  { x: 21.0, y: 12.9 },
+  { x: 25.0, y: 12.9 },
+];
+
+/** 野怪营地参数 */
+export const CAMP_HP = 220;
+export const CAMP_DAMAGE = 9;
+export const CAMP_HIT_SPEED = 0.9;
+export const CAMP_SPEED = 1.5;
+export const CAMP_SIGHT = 2.2;
+export const CAMP_RESPAWN_SECONDS = 25;
+/** 野怪经验/金币占位（M2 英雄等级接入后用） */
+export const CAMP_REWARD = 12;
+
+// ---- 肉山（Roshan） ----
+
+/** 肉山位置：中央偏左，三条路的汇流处北侧，单独立一块坑地 */
+export const ROSHAN_POS = { x: 17.4, y: 2.6 };
+export const ROSHAN_HP = 1800;
+export const ROSHAN_DAMAGE = 38;
+export const ROSHAN_HIT_SPEED = 1.1;
+export const ROSHAN_SPEED = 1.1;
+export const ROSHAN_RANGE = 1.0;
+export const ROSHAN_SIGHT = 4.6;
+/** 肉山击杀后给全队强化（M4 接入 buff 下发） */
+export const ROSHAN_TEAM_BUFF_SECONDS = 90;
+export const ROSHAN_TEAM_BUFF_DAMAGE = 1.25;
+export const ROSHAN_RESPAWN_SECONDS = 150;
+
+/** 怪物出生（入口）抖动范围 —— 只在 y 上抖，避免怪物出到地图外 */
+export const MOB_SPAWN_JITTER = 0.8;
 
 // ============================================================
 // 怪物表 + 简化波次（精简 M0 测试版）

@@ -1,7 +1,9 @@
 import {
-  BATTLE_SECONDS, BRIDGE_HALF_HEIGHT, BRIDGE_YS, CORE_DAMAGE, CORE_RANGE,
-  DOUBLE_ELIXIR_LAST_SECONDS, ELIXIR_MAX, ELIXIR_PER_SECOND, GRID_H, KING_TOWER,
-  LANE_COUNT, MOB_STATS, PRINCESS_TOWER, PROJECTILE_SPEED, RIVER_CENTER_X,
+  BATTLE_SECONDS, BRIDGE_HALF_HEIGHT, BRIDGE_YS,
+  CAMP_DAMAGE, CAMP_HIT_SPEED, CAMP_RESPAWN_SECONDS, CAMP_SIGHT, CAMP_SPEED,
+  CORE_DAMAGE, CORE_RANGE,
+  DOUBLE_ELIXIR_LAST_SECONDS, ELIXIR_MAX, ELIXIR_PER_SECOND, GRID_H, JUNGLE_CAMPS, KING_TOWER,
+  LANE_COUNT, LANE_PATHS, MOB_STATS, PRINCESS_TOWER, PROJECTILE_SPEED, RIVER_CENTER_X,
   RIVER_MAX_X, RIVER_MIN_X, SUDDEN_DEATH_ELIXIR_MULTIPLIER, SUDDEN_DEATH_SECONDS,
   TIEBREAKER_DRAIN_SECONDS, TOWER_RADIUS, UNIT_RADIUS, WAVES_M0, WAVE_BREAK_SECONDS,
 } from '../constants';
@@ -21,6 +23,12 @@ function comp(entity: SimEntity): CardComponents | undefined {
  * Avança a simulação em dt segundos. Chamado pelo servidor a cada tick.
  * NÃO limpa `state.events`: quem consome (servidor/testes) deve limpar após
  * ler — assim eventos gerados por playCard/useAbility entre ticks não se perdem.
+ *
+ * Nota de tipagem: o parâmetro é declarado como `SimState` mutável de propósito.
+ * Se fosse `Readonly<SimState>` o TS estreitaria `state.phase` no ponto da
+ * chamada e chamadores que rodam em loop (`while (state.phase !== 'ended')`)
+ * acusariam TS2367 ("battle" e "ended" sem sobreposição). Assinatura explícita
+ * com retorno void força o TS a não estreitar `state` após a chamada.
  */
 export function stepSimulation(state: SimState, dt: number): void {
   state.tick++;
@@ -763,7 +771,9 @@ function stepDefense(state: SimState, dt: number): void {
       continue;
     }
     if (entity.kind === 'unit') {
-      if (entity.mobVariant) {
+      if (entity.campIndex !== undefined) {
+        stepJungleCamp(state, entity, dt); // 野区营地野怪（不推进城堡）
+      } else if (entity.mobVariant) {
         stepMob(state, entity, dt);
       } else {
         stepUnit(state, entity, dt); // 玩家英雄（M3 接 cards 体系时复用）
@@ -784,11 +794,11 @@ function stepDefense(state: SimState, dt: number): void {
 }
 
 /**
- * 怪物步进（M0）：
- * - 目标 = 最近 side='left' 的塔（点位或核心，复用同一种行为）
+ * 怪物步进（M1：沿蜿蜒路径巡航）。
+ * - 沿 LANE_PATHS[lane] 的航点顺序推进，走到最后一个航点后扑向核心
+ * - 目标 = 最近的 side='left' 塔（点位或核心）；进入射程就停下开砍
  * - 没有 cardId，跳过 cards.components 体系，直接用 MOB_STATS
  * - 近战：贴身后直接扣血（非弹道），符合"涌到墙根砍"直觉
- * - 寻路：无视河桥，y 方向单向压向核心（怪物在防守模式只走"从远方到核心"一条路）
  */
 function stepMob(state: SimState, mob: SimEntity, dt: number): void {
   const variant: MobVariant | undefined = mob.mobVariant;
@@ -807,11 +817,11 @@ function stepMob(state: SimState, mob: SimEntity, dt: number): void {
   const dx = target.x - mob.x;
   const dy = target.y - mob.y;
   const dist = Math.hypot(dx, dy) - targetR;
+  mob.facing = dx >= 0 ? 1 : -1;
 
   if (dist <= stats.range) {
     // 已经贴上了：开砍
     mob.action = 'attack';
-    mob.facing = dy >= 0 ? 1 : -1;
     if (mob.attackCooldown === 0) {
       target.hp -= stats.damage;
       if (target.hp < 0) target.hp = 0;
@@ -822,14 +832,111 @@ function stepMob(state: SimState, mob: SimEntity, dt: number): void {
     return;
   }
 
-  // 走直线（y 方向为主）
-  const speed = stats.speed;
-  const len = Math.hypot(dx, dy) || 1;
-  const move = Math.min(speed * dt, len);
-  mob.x += (dx / len) * move;
-  mob.y += (dy / len) * move;
+  // 沿路径航点前进
+  const path = LANE_PATHS[mob.lane ?? 0] ?? LANE_PATHS[1]!;
+  let idx = mob.waypointIndex ?? 1;
+  // 已到路径末端 → 直接扑向目标（汇流点到城堡的最后一段）
+  if (idx >= path.length) {
+    moveTowardsPoint(mob, target.x, target.y, stats.speed * dt);
+    mob.action = 'walk';
+    return;
+  }
+
+  let remaining = stats.speed * dt;
+  let guard = 0;
+  while (remaining > 0 && idx < path.length && guard++ < 8) {
+    const wp = path[idx]!;
+    const ddx = wp.x - mob.x;
+    const ddy = wp.y - mob.y;
+    const d = Math.hypot(ddx, ddy);
+    if (d <= remaining) {
+      mob.x = wp.x;
+      mob.y = wp.y;
+      mob.pathDistance = (mob.pathDistance ?? 0) + d;
+      remaining -= d;
+      idx++;
+      continue;
+    }
+    mob.x += (ddx / d) * remaining;
+    mob.y += (ddy / d) * remaining;
+    mob.pathDistance = (mob.pathDistance ?? 0) + remaining;
+    remaining = 0;
+  }
+  mob.waypointIndex = idx;
   mob.action = 'walk';
-  mob.facing = dy >= 0 ? 1 : -1;
+  if (idx >= path.length) {
+    // 路径走完，扑向核心
+    moveTowardsPoint(mob, target.x, target.y, 0);
+  }
+}
+
+/** 朝某点走 dist 距离（dist=0 只更新朝向） */
+function moveTowardsPoint(mob: SimEntity, x: number, y: number, dist: number): void {
+  const dx = x - mob.x;
+  const dy = y - mob.y;
+  const len = Math.hypot(dx, dy) || 1;
+  if (dist <= 0) return;
+  const step = Math.min(dist, len);
+  mob.x += (dx / len) * step;
+  mob.y += (dy / len) * step;
+}
+
+/**
+ * 野怪营地步进（M1）：野怪只在自己营地附近游荡，不推进城堡。
+ * 被英雄击杀后进入 campRespawn 倒计时，到点原地满血复活。
+ */
+function stepJungleCamp(state: SimState, camp: SimEntity, dt: number): void {
+  const stats = MOB_STATS[camp.mobVariant ?? 'kobold'];
+  camp.attackCooldown = Math.max(0, camp.attackCooldown - dt);
+
+  // 复活倒计时（实体此时 hp 已归零但未被删除）
+  if (camp.hp <= 0) return;
+
+  const home = JUNGLE_CAMPS[camp.campIndex ?? 0] ?? { x: camp.x, y: camp.y };
+
+  // 反击：最近的敌方单位（M2 起是英雄；M1 无英雄时保持原地）
+  let victim: SimEntity | undefined;
+  let bestDist = CAMP_SIGHT;
+  for (const e of Object.values(state.entities)) {
+    if (e.side !== 'left' || e.hp <= 0 || e.kind !== 'unit') continue;
+    const d = Math.hypot(e.x - camp.x, e.y - camp.y);
+    if (d < bestDist) {
+      bestDist = d;
+      victim = e;
+    }
+  }
+
+  if (victim) {
+    camp.facing = victim.x >= camp.x ? 1 : -1;
+    if (bestDist <= 1.0) {
+      camp.action = 'attack';
+      if (camp.attackCooldown === 0) {
+        victim.hp -= CAMP_DAMAGE;
+        if (victim.hp < 0) victim.hp = 0;
+        camp.attackCooldown = CAMP_HIT_SPEED;
+        state.events.push({ type: 'hit', x: victim.x, y: victim.y, ranged: false, amount: CAMP_DAMAGE });
+      }
+      return;
+    }
+    moveTowardsPoint(camp, victim.x, victim.y, CAMP_SPEED * dt);
+    camp.action = 'walk';
+    return;
+  }
+
+  // 无敌人：绕营地小圈巡逻（确定性，用 tick 派生角度）
+  const t = state.tick * 0.02 + (camp.campIndex ?? 0) * 1.7;
+  const wanderX = home.x + Math.cos(t) * 0.7;
+  const wanderY = home.y + Math.sin(t) * 0.5;
+  const dx = wanderX - camp.x;
+  const dy = wanderY - camp.y;
+  const d = Math.hypot(dx, dy);
+  if (d > 0.05) {
+    moveTowardsPoint(camp, wanderX, wanderY, Math.min(CAMP_SPEED * 0.5 * dt, d));
+    camp.action = 'walk';
+    camp.facing = dx >= 0 ? 1 : -1;
+  } else {
+    camp.action = 'idle';
+  }
 }
 
 /** 怪物选目标：最近 side='left' 的塔（点位或核心），无视河桥 */
@@ -905,6 +1012,14 @@ function removeDeadEntitiesDefense(state: SimState): void {
       toRemove.push(entity.id);
       continue;
     }
+    // 野区营地野怪：不删除，进入刷新倒计时（M1 打野循环）
+    if (entity.campIndex !== undefined) {
+      if ((entity.campRespawn ?? 0) <= 0) {
+        entity.campRespawn = CAMP_RESPAWN_SECONDS;
+        state.events.push({ type: 'death', x: entity.x, y: entity.y, kind: 'unit' });
+      }
+      continue;
+    }
     // 怪物死亡 → 删除 + 死亡事件（供客户端掉血字/动画用）
     if (entity.mobVariant) {
       toRemove.push(entity.id);
@@ -936,7 +1051,7 @@ function removeDeadEntitiesDefense(state: SimState): void {
   }
 }
 
-/** 把当前核心血同步到 state.coreHp，便于客户端读 */
+/** 把当前核心血同步到 state.coreHp，便于客户端读；同时推进野区营地刷新 */
 function updateClockDefense(state: SimState, dt: number): void {
   const core = Object.values(state.entities).find(
     (e) => e.kind === 'tower' && e.tower === 'king' && e.side === 'left',
@@ -944,4 +1059,15 @@ function updateClockDefense(state: SimState, dt: number): void {
   state.coreHp = core?.hp ?? 0;
   state.coreMaxHp = core?.maxHp ?? state.coreMaxHp ?? 0;
   state.timeRemaining = Math.max(0, state.timeRemaining - dt);
+
+  // 野区营地刷新：hp 为 0 的营地倒计时结束后原地满血复活
+  for (const camp of Object.values(state.entities)) {
+    if (camp.campIndex === undefined || camp.hp > 0) continue;
+    camp.campRespawn = Math.max(0, (camp.campRespawn ?? 0) - dt);
+    if (camp.campRespawn === 0) {
+      camp.hp = camp.maxHp;
+      camp.action = 'idle';
+      state.events.push({ type: 'spawn', x: camp.x, y: camp.y, cardId: 'mob:camp', side: 'right' });
+    }
+  }
 }

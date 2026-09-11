@@ -86,6 +86,20 @@ export interface SimEntity {
   buff?: number;
   /** 防守模式怪物种类（horde / ogre / imp），有了就走怪物步进 */
   mobVariant?: MobVariant;
+  /** 防守模式：沿路线巡航的当前目标航点序号（M1 蜿蜒路径） */
+  waypointIndex?: number;
+  /** 防守模式：已走过的总路程（tiles），用于确定巡逻抖动，保证确定性 */
+  pathDistance?: number;
+  /** 野怪营地：归属野区索引 */
+  campIndex?: number;
+  /** 野怪营地：刷新倒计时（秒） */
+  campRespawn?: number;
+  /** 是否为肉山（Roshan） */
+  isRoshan?: boolean;
+  /** 肉山：是否已苏醒 */
+  roshanAwake?: number;
+  /** 肉山：是否被击杀 */
+  roshanSlain?: number;
 }
 
 /** Dano em trânsito: aplicado quando o projétil chega ao alvo. */
@@ -135,6 +149,7 @@ export interface SimState {
   tick: number;
   /** Tempo acumulado de simulação em segundos (para statuses) */
   time: number;
+  /** TS 的控制流分析会把这个字段在函数内窄化；stepSimulation 会改它，故声明为可变 */
   phase: Phase;
   timeRemaining: number;
   suddenDeath: boolean;
@@ -162,6 +177,10 @@ export interface SimState {
   /** 核心血量 */
   coreHp?: number;
   coreMaxHp?: number;
+  /** 肉山状态（M4 全队 Buff）：0=未苏醒 1=苏醒中 2=已击杀 */
+  roshanState?: number;
+  /** 全队强化 Buff 剩余秒数（肉山掉落） */
+  teamBuffUntil?: number;
 }
 
 /** 波次定义：某波刷什么怪、刷多少 */

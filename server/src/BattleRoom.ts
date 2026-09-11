@@ -320,6 +320,9 @@ export class BattleRoom extends Room<BattleState> {
     state.waveCountdown = sim.waveCountdown ?? 0;
     state.coreHp = sim.coreHp ?? 0;
     state.coreMaxHp = sim.coreMaxHp ?? 0;
+    state.roshanState = sim.roshanState ?? 0;
+    // M1：肉山刷新倒计时用 sim.time 派生，避免再加一个 sim 字段
+    state.teamBuffSeconds = Math.max(0, (sim.teamBuffUntil ?? 0) - sim.time);
 
     for (const [sessionId, playerSchema] of state.players) {
       const side = sessionId === 'bot' ? BOT_SIDE : this.sides.get(sessionId);
@@ -367,6 +370,8 @@ export class BattleRoom extends Room<BattleState> {
       schema.lane = entity.lane ?? -1;
       schema.pointIndex = entity.pointIndex ?? -1;
       schema.buff = entity.buff ?? 1;
+      schema.campIndex = entity.campIndex ?? -1;
+      schema.isRoshan = entity.isRoshan === true;
     }
 
     for (const id of [...state.entities.keys()]) {

@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import type { Room } from 'colyseus.js';
-import { CORE_HP, GRID_H, LANE_XS, getCard, gridToScreen } from '@claude-royale/shared';
+import {
+  CORE_HP, CORE_POS, DEFENSE_WAVE_COUNT, JUNGLE_AREAS, JUNGLE_CAMPS,
+  LANE_PATHS, ROSHAN_POS, getCard, gridToScreen,
+} from '@claude-royale/shared';
 import type { SimEvent } from '@claude-royale/shared';
 import { drawArena, drawDeployZone, drawDropPreview, type ArenaTheme } from './arena';
 import { ambient } from './ambient';
@@ -175,31 +178,136 @@ export class BattleScene extends Phaser.Scene {
   }
 
   /**
-   * 防守模式（M0）的极简 overlay：
-   * - 画 3 条进攻 lane 的竖条色块
-   * - 复用 LANE_XS 投影定位
-   * - 顶部 HUD：wave 序号 / 距离下波倒计时 / 核心 HP 条
-   * - 监听 room.state 增量更新 HUD
+   * 防守模式（M1）的战场 overlay —— 像素复古风：
+   * - 深绿草地底纹 + 像素噪点（确定性，用格子坐标做伪随机）
+   * - 三条蜿蜒土路（沿 LANE_PATHS 航点插值成粗带）
+   * - 左侧城堡（核心）+ 路边 9 个点位
+   * - 两片野区（深色丛林块）+ 野怪营地
+   * - 世界树 / 肉山坑
+   * - 顶部 HUD：波次 / 倒计时 / 核心 HP 条
    */
   private setupDefenseOverlay(): void {
-    // --- 3 条进攻路线：从顶部（远）到底部（核心）各画一条色带 ---
-    const laneGfx = this.add.graphics();
-    laneGfx.setDepth(-500);
     const LANE_COLORS = [0xff5a5a, 0xff9c3a, 0x5ac5ff];
-    LANE_XS.forEach((cx, i) => {
-      const top = gridToScreen(cx, 0);
-      const bot = gridToScreen(cx, GRID_H);
-      const color = LANE_COLORS[i] ?? 0xffffff;
-      laneGfx.fillStyle(color, 0.06);
-      laneGfx.fillRect(top.x - 50, top.y, 100, bot.y - top.y);
-      laneGfx.lineStyle(2, color, 0.5);
-      laneGfx.lineBetween(top.x, top.y, bot.x, bot.y);
-      this.add.text(top.x - 16, top.y - 18, `L${i + 1}`, {
-        fontSize: '14px', color: '#ffffff',
+
+    // ---------- 1. 草地底纹（像素噪点） ----------
+    const grass = this.add.graphics();
+    grass.setDepth(-900);
+    const worldW = 3600;
+    const worldH = 2400;
+    grass.fillStyle(0x2f5a2c, 1);
+    grass.fillRect(-worldW / 2, -worldH, worldW, worldH);
+    // 8px 网格噪点：深浅草块，确定性哈希
+    const TILE = 8;
+    for (let gx = -worldW / 2; gx < worldW / 2; gx += TILE * 4) {
+      for (let gy = -worldH; gy < worldH; gy += TILE * 4) {
+        const h = Math.abs(Math.sin((gx + 1) * 12.9898 + (gy + 1) * 78.233) * 43758.5453) % 1;
+        if (h < 0.28) {
+          grass.fillStyle(0x356331, 1);
+        } else if (h < 0.5) {
+          grass.fillStyle(0x295024, 1);
+        } else {
+          continue;
+        }
+        grass.fillRect(gx, gy, TILE * 4, TILE * 4);
+      }
+    }
+
+    // ---------- 2. 两条河/沟（把三条路在地图上分隔开，纯装饰） ----------
+    // 跳过：M1 不引入新的地形阻碍，避免和路径跟随冲突。
+
+    // ---------- 3. 三条蜿蜒土路 ----------
+    const roadGfx = this.add.graphics();
+    roadGfx.setDepth(-800);
+    LANE_PATHS.forEach((path, laneIdx) => {
+      const pts = path.map((w) => gridToScreen(w.x, w.y));
+      const color = LANE_COLORS[laneIdx] ?? 0xffffff;
+      // 底色（土黄）：用粗线
+      roadGfx.lineStyle(56, 0x8a6a44, 1);
+      roadGfx.beginPath();
+      roadGfx.moveTo(pts[0]!.x, pts[0]!.y);
+      for (let i = 1; i < pts.length; i++) roadGfx.lineTo(pts[i]!.x, pts[i]!.y);
+      roadGfx.strokePath();
+      // 亮面（沙色）：稍细
+      roadGfx.lineStyle(40, 0xc2a274, 1);
+      roadGfx.beginPath();
+      roadGfx.moveTo(pts[0]!.x, pts[0]!.y);
+      for (let i = 1; i < pts.length; i++) roadGfx.lineTo(pts[i]!.x, pts[i]!.y);
+      roadGfx.strokePath();
+      // 路线色描边（弱），让玩家一眼分清三条路
+      roadGfx.lineStyle(3, color, 0.35);
+      roadGfx.beginPath();
+      roadGfx.moveTo(pts[0]!.x, pts[0]!.y);
+      for (let i = 1; i < pts.length; i++) roadGfx.lineTo(pts[i]!.x, pts[i]!.y);
+      roadGfx.strokePath();
+
+      // 入口标记
+      const head = pts[0]!;
+      const label = this.add.text(head.x - 24, head.y - 40, `L${laneIdx + 1} ▸`, {
+        fontSize: '22px', color: '#ffffff', fontStyle: 'bold',
+        stroke: '#000000', strokeThickness: 4,
       }).setDepth(100);
+      label.setAlpha(0.9);
     });
 
-    // --- 点位 / 核心高亮：跟随 entities 实时位置刷新 ---
+    // ---------- 4. 野区（深色丛林块 + 野怪营地） ----------
+    const jungleGfx = this.add.graphics();
+    jungleGfx.setDepth(-850);
+    JUNGLE_AREAS.forEach((area) => {
+      const tl = gridToScreen(area.x - area.w / 2, area.y - area.h / 2);
+      const br = gridToScreen(area.x + area.w / 2, area.y + area.h / 2);
+      jungleGfx.fillStyle(0x1f3d1c, 0.55);
+      jungleGfx.fillRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+      jungleGfx.lineStyle(3, 0x4a7a3a, 0.5);
+      jungleGfx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    });
+    JUNGLE_CAMPS.forEach((camp) => {
+      const p = gridToScreen(camp.x, camp.y);
+      jungleGfx.fillStyle(0x6b4a2a, 0.5);
+      jungleGfx.fillCircle(p.x, p.y, 26);
+      jungleGfx.lineStyle(3, 0x8f6b3f, 0.8);
+      jungleGfx.strokeCircle(p.x, p.y, 26);
+    });
+
+    // ---------- 5. 肉山坑（世界树） ----------
+    const roshanP = gridToScreen(ROSHAN_POS.x, ROSHAN_POS.y);
+    const roshanGfx = this.add.graphics();
+    roshanGfx.setDepth(-840);
+    roshanGfx.fillStyle(0x4a3358, 0.6);
+    roshanGfx.fillCircle(roshanP.x, roshanP.y, 62);
+    roshanGfx.lineStyle(4, 0x8e6bb0, 0.85);
+    roshanGfx.strokeCircle(roshanP.x, roshanP.y, 62);
+    this.add.text(roshanP.x - 26, roshanP.y + 70, '肉山', {
+      fontSize: '24px', color: '#e0b6ff', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 5,
+    }).setDepth(100);
+
+    // ---------- 6. 城堡（核心） ----------
+    const coreP = gridToScreen(CORE_POS.x, CORE_POS.y);
+    const castleGfx = this.add.graphics();
+    castleGfx.setDepth(-700);
+    // 城基
+    castleGfx.fillStyle(0x6d6f78, 1);
+    castleGfx.fillRect(coreP.x - 76, coreP.y - 56, 152, 112);
+    // 城垛
+    castleGfx.fillStyle(0x8b8d96, 1);
+    for (let i = 0; i < 5; i++) {
+      castleGfx.fillRect(coreP.x - 76 + i * 32, coreP.y - 74, 20, 22);
+    }
+    // 城门
+    castleGfx.fillStyle(0x3b2a1b, 1);
+    castleGfx.fillRect(coreP.x - 22, coreP.y + 10, 44, 46);
+    // 塔楼
+    castleGfx.fillStyle(0x9aa0ad, 1);
+    castleGfx.fillRect(coreP.x - 104, coreP.y - 84, 34, 140);
+    castleGfx.fillRect(coreP.x + 70, coreP.y - 84, 34, 140);
+    castleGfx.lineStyle(3, 0x2a2c33, 1);
+    castleGfx.strokeRect(coreP.x - 76, coreP.y - 56, 152, 112);
+    this.add.text(coreP.x - 34, coreP.y - 112, '城堡', {
+      fontSize: '26px', color: '#ffe082', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 6,
+    }).setDepth(100);
+
+    // ---------- 7. 点位 / 核心高亮 + 怪物血条 ----------
     const pointsGfx = this.add.graphics();
     pointsGfx.setDepth(-400);
     const updatePoints = (): void => {
@@ -207,37 +315,36 @@ export class BattleScene extends Phaser.Scene {
       this.room.state.entities.forEach((ent: unknown) => {
         const e = ent as {
           kind: string; side: string; tower: string; x: number; y: number; hp: number;
+          mobVariant?: string; campIndex?: number;
         };
+        if (e.kind === 'unit') return;
         if (e.kind !== 'tower' || e.side !== 'left') return;
         const p = gridToScreen(e.x, e.y);
         if (e.tower === 'king') {
-          // 核心：金色大圆
-          pointsGfx.fillStyle(0xffd54f, 0.7);
-          pointsGfx.fillCircle(p.x, p.y, 14);
-          pointsGfx.lineStyle(2, 0xffd54f, 0.9);
-          pointsGfx.strokeCircle(p.x, p.y, 18);
+          // 核心：金圈（城堡本体已画）
+          pointsGfx.lineStyle(4, 0xffd54f, 0.85);
+          pointsGfx.strokeCircle(p.x, p.y, 82);
         } else {
-          // 点位：青色小圆，失守变灰
           const alive = e.hp > 0;
-          pointsGfx.fillStyle(alive ? 0x80cbc4 : 0x555555, alive ? 0.55 : 0.3);
-          pointsGfx.fillCircle(p.x, p.y, 8);
-          pointsGfx.lineStyle(1, alive ? 0x4db6ac : 0x888888, 0.9);
-          pointsGfx.strokeCircle(p.x, p.y, 10);
+          pointsGfx.fillStyle(alive ? 0x4dd0c1 : 0x555555, alive ? 0.6 : 0.3);
+          pointsGfx.fillCircle(p.x, p.y, 16);
+          pointsGfx.lineStyle(3, alive ? 0xa7ffeb : 0x888888, 0.95);
+          pointsGfx.strokeCircle(p.x, p.y, 18);
         }
       });
     };
     updatePoints();
 
-    // --- 顶部 HUD：波次 / 倒计时 / 核心血条 ---
+    // ---------- 8. 顶部 HUD ----------
     const hudText = this.add.text(20, 20, '防守模式', {
       fontSize: '20px', color: '#ffffff', fontStyle: 'bold',
-    }).setDepth(2000);
-    const hudBar = this.add.graphics().setDepth(2000);
+    }).setScrollFactor(0).setDepth(2000);
+    const hudBar = this.add.graphics().setScrollFactor(0).setDepth(2000);
 
     const updateHud = (): void => {
       const st = this.room.state as unknown as {
         wave?: number; waveCountdown?: number; coreHp?: number;
-        coreMaxHp?: number; phase?: string; winner?: string;
+        coreMaxHp?: number; phase?: string; winner?: string; timeRemaining?: number;
       };
       const wave = st.wave ?? 1;
       const cd = st.waveCountdown ?? 0;
@@ -247,21 +354,31 @@ export class BattleScene extends Phaser.Scene {
       const status = ended
         ? (st.winner === 'left' ? '守住！' : st.winner === 'right' ? '核心失守' : '平局')
         : `下波 ${cd.toFixed(1)}s`;
-      hudText.setText(`🛡️ Wave ${wave} · ${status} · 核心 ${Math.round(coreHp)}/${Math.round(coreMax)}`);
+      const mm = Math.floor((st.timeRemaining ?? 0) / 60);
+      const ss = Math.floor((st.timeRemaining ?? 0) % 60);
+      hudText.setText(
+        `🛡️ 第 ${wave}/${DEFENSE_WAVE_COUNT} 波 · ${status} · 剩余 ${mm}:${String(ss).padStart(2, '0')}`,
+      );
 
-      const BAR_W = 240, BAR_H = 18, BX = 20, BY = 48;
+      const BAR_W = 320, BAR_H = 20, BX = 20, BY = 50;
       const ratio = coreMax > 0 ? Math.max(0, Math.min(1, coreHp / coreMax)) : 0;
       hudBar.clear();
-      hudBar.fillStyle(0x000000, 0.6);
+      hudBar.fillStyle(0x000000, 0.65);
       hudBar.fillRect(BX, BY, BAR_W, BAR_H);
       hudBar.fillStyle(ratio > 0.4 ? 0x66bb6a : ratio > 0.2 ? 0xffb74d : 0xef5350, 1);
       hudBar.fillRect(BX, BY, BAR_W * ratio, BAR_H);
-      hudBar.lineStyle(1, 0xffffff, 0.6);
+      hudBar.lineStyle(2, 0xffffff, 0.7);
       hudBar.strokeRect(BX, BY, BAR_W, BAR_H);
+
+      this.add.text(0, 0, '', { fontSize: '1px' }); // noop 占位，避免空帧
+      hudBarLabel.setText(`核心 ${Math.round(coreHp)} / ${Math.round(coreMax)}`);
     };
+    const hudBarLabel = this.add.text(20, 74, '核心', {
+      fontSize: '16px', color: '#ffffff', fontStyle: 'bold',
+    }).setScrollFactor(0).setDepth(2000);
     updateHud();
 
-    // --- 监听 schema 增量变化 ---
+    // ---------- 9. 监听 schema 增量 ----------
     this.room.onStateChange(() => {
       updatePoints();
       updateHud();

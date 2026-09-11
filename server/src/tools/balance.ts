@@ -14,6 +14,11 @@ const MATCHES = Number(process.argv[2] ?? 400);
 const MAX_SECONDS = 300; // 3 min + morte súbita + folga
 const ALL_CARDS = collectionCards().map((card) => card.id);
 
+/** Indireção para evitar o estreitamento de `state.phase` pelo TS (TS2367). */
+function matchEnded(state: SimState): boolean {
+  return state.phase === 'ended';
+}
+
 interface CardStats {
   games: number;
   wins: number;
@@ -43,7 +48,7 @@ function runMatch(): { winner: string; leftDeck: string[]; rightDeck: string[] }
   const cooldowns: Record<Side, number> = { left: 0, right: 0 };
   const maxTicks = MAX_SECONDS / TICK_DT;
 
-  for (let tick = 0; tick < maxTicks && state.phase !== 'ended'; tick++) {
+  for (let tick = 0; tick < maxTicks && !matchEnded(state); tick++) {
     for (const side of ['left', 'right'] as Side[]) {
       cooldowns[side] -= TICK_DT;
       if (cooldowns[side] > 0) continue;

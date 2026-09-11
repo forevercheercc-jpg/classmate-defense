@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import {
-  CORE_HP, CORE_POS, LANE_COUNT, MOB_STATS, POINT_HP,
-  POINT_YS, POINTS_PER_LANE, TICK_DT, WAVE_BREAK_SECONDS, WAVES_M0,
+  CAMP_HP, CORE_HP, CORE_POS, DEFENSE_BATTLE_SECONDS, JUNGLE_CAMPS, LANE_COUNT,
+  LANE_PATHS, MOB_STATS, POINT_HP,
+  POINT_POS, POINTS_PER_LANE, TICK_DT, WAVE_BREAK_SECONDS, WAVES_M0,
 } from '../src/constants';
 import { createInitialState, spawnMob } from '../src/sim/state';
 import { stepSimulation } from '../src/sim/step';
@@ -12,8 +13,8 @@ function runSeconds(state: SimState, seconds: number): void {
   for (let i = 0; i < ticks; i++) stepSimulation(state, TICK_DT);
 }
 
-describe('M0 防守模式', () => {
-  test('createInitialState({ defense: true }) 生成 1 核心 + 9 点位 + 立即进入战斗', () => {
+describe('M0/M1 防守模式', () => {
+  test('createInitialState({ defense: true }) 生成 1 核心 + 9 点位 + 野怪营地', () => {
     const state = createInitialState({ defense: true });
     expect(state.defense).toBe(true);
     expect(state.phase).toBe('battle');
@@ -21,6 +22,7 @@ describe('M0 防守模式', () => {
     expect(state.coreMaxHp).toBe(CORE_HP);
     expect(state.wave).toBe(1);
     expect(state.waveCountdown).toBe(WAVE_BREAK_SECONDS);
+    expect(DEFENSE_BATTLE_SECONDS).toBe(480); // M1：单局拉长到 8 分钟
 
     const kings = Object.values(state.entities).filter(
       (e) => e.kind === 'tower' && e.tower === 'king' && e.side === 'left',
@@ -30,15 +32,19 @@ describe('M0 防守模式', () => {
     );
     expect(kings.length).toBe(1);
     expect(princesses.length).toBe(LANE_COUNT * POINTS_PER_LANE); // 9
-    // 核心位置正确
+    // 核心位置正确（M1 移到左侧中央）
     expect(kings[0]?.x).toBe(CORE_POS.x);
     expect(kings[0]?.y).toBe(CORE_POS.y);
     expect(kings[0]?.hp).toBe(CORE_HP);
     // 点位血量一致
     expect(princesses[0]?.hp).toBe(POINT_HP);
+    // 野区营地（M1）
+    const camps = Object.values(state.entities).filter((e) => e.campIndex !== undefined);
+    expect(camps.length).toBe(JUNGLE_CAMPS.length);
+    expect(camps.every((c) => c.hp === CAMP_HP)).toBe(true);
   });
 
-  test('每个点位都有正确的 lane/pointIndex/buff', () => {
+  test('每个点位都有正确的 lane/pointIndex/buff，坐标来自 POINT_POS', () => {
     const state = createInitialState({ defense: true });
     for (let lane = 0; lane < LANE_COUNT; lane++) {
       for (let p = 0; p < POINTS_PER_LANE; p++) {
@@ -47,10 +53,27 @@ describe('M0 防守模式', () => {
         );
         expect(points.length).toBe(1);
         const point = points[0]!;
-        // 实际点位 y 跟 POINT_YS 一致
-        expect(point.y).toBe(POINT_YS[p] ?? -1);
+        const expected = POINT_POS[lane]![p]!;
+        expect(point.x).toBe(expected.x);
+        expect(point.y).toBe(expected.y);
       }
     }
+  });
+
+  test('三条路都是蜿蜒多航点，且终点汇流到城堡前', () => {
+    expect(LANE_PATHS.length).toBe(LANE_COUNT);
+    LANE_PATHS.forEach((path) => {
+      // 蜿蜒：至少 6 个航点（直线只需 2 个）
+      expect(path.length).toBeGreaterThanOrEqual(6);
+      // 从右侧入口出发
+      expect(path[0]!.x).toBeGreaterThan(30);
+      // 终点靠近城堡（x 小于 12）
+      expect(path[path.length - 1]!.x).toBeLessThan(12);
+    });
+    // 三条路终点相同（汇流）
+    const ends = LANE_PATHS.map((p) => p[p.length - 1]!);
+    expect(ends[0]!.x).toBe(ends[1]!.x);
+    expect(ends[1]!.x).toBe(ends[2]!.x);
   });
 
   test('波次结束呼吸后开始刷怪，第一只在 N 秒内出现', () => {
@@ -65,21 +88,65 @@ describe('M0 防守模式', () => {
     expect(afterCount).toBeGreaterThan(beforeCount);
   });
 
-  test('怪物会寻找最近的 side=left 塔并靠近', () => {
+  test('怪物从右侧入口出生并沿路径向西（x 减小）推进', () => {
     const state = createInitialState({ defense: true });
-    // 跳过呼吸 + 一些 spawn 时间
     runSeconds(state, WAVE_BREAK_SECONDS + 3);
 
-    const mobs = Object.values(state.entities).filter((e) => e.mobVariant);
+    const mobs = Object.values(state.entities).filter(
+      (e) => e.mobVariant && e.campIndex === undefined,
+    );
     expect(mobs.length).toBeGreaterThan(0);
-    // 每只怪物都向 y 增大的方向移动（向核心）
+    // 每只都还没走远（初始 x 在 32 附近，跑 3 秒最多走 ~8 tiles）
     for (const m of mobs) {
-      // 至少要有一只 y > MOB_SPAWN_Y 才有"动过"
-      // 由于确定性，不一定每只都跑很远，但都该大于 spawn 区上限
-      expect(m.y).toBeGreaterThanOrEqual(0);
+      expect(m.x).toBeGreaterThan(24);
+      expect(m.x).toBeLessThanOrEqual(33);
     }
-    // 在前 3 步开始时：
-    // 没有走到核心或点位之前的怪物应该都在路上
+
+    // 跑一段时间后，怪物整体应该向西移动（x 平均值变小）
+    const avgXBefore = mobs.reduce((s, m) => s + m.x, 0) / mobs.length;
+    runSeconds(state, 8);
+    const mobsAfter = Object.values(state.entities).filter(
+      (e) => e.mobVariant && e.campIndex === undefined,
+    );
+    const avgXAfter = mobsAfter.reduce((s, m) => s + m.x, 0) / mobsAfter.length;
+    expect(avgXAfter).toBeLessThan(avgXBefore);
+  });
+
+  test('spawnMob 出生点落在该路第一个航点（右侧入口）', () => {
+    const state = createInitialState({ defense: true });
+    for (let lane = 0; lane < LANE_COUNT; lane++) {
+      const mob = spawnMob(state, lane, 'kobold', 1, 1);
+      const entry = LANE_PATHS[lane]![0]!;
+      expect(mob.x).toBe(entry.x);
+      // y 只允许 MOB_SPAWN_JITTER 范围内的抖动
+      expect(Math.abs(mob.y - entry.y)).toBeLessThanOrEqual(0.85);
+      expect(mob.waypointIndex).toBe(1);
+    }
+  });
+
+  test('怪物路径跟随：waypointIndex 单调递增', () => {
+    const state = createInitialState({ defense: true });
+    const mob = spawnMob(state, 1, 'kobold', 1, 1);
+    const firstIdx = mob.waypointIndex ?? 0;
+    runSeconds(state, 6);
+    expect(mob.waypointIndex ?? 0).toBeGreaterThanOrEqual(firstIdx);
+    // 走过的路程应大于 0
+    expect(mob.pathDistance ?? 0).toBeGreaterThan(1);
+  });
+
+  test('野怪营地不推进城堡，被打死后进入刷新倒计时', () => {
+    const state = createInitialState({ defense: true });
+    const camp = Object.values(state.entities).find((e) => e.campIndex !== undefined)!;
+    const homeX = camp.x;
+    runSeconds(state, 6);
+    // 野怪只在营地附近游荡，绝不会跑到城堡（x < 12）
+    expect(camp.x).toBeGreaterThan(homeX - 3);
+
+    // 手动打死 → 进入刷新倒计时，实体不删除
+    camp.hp = 0;
+    stepSimulation(state, TICK_DT);
+    expect(state.entities[camp.id]).toBeDefined();
+    expect(camp.campRespawn).toBeGreaterThan(0);
   });
 
   test('怪物打到塔会造成塔掉血', () => {
@@ -90,8 +157,8 @@ describe('M0 防守模式', () => {
     const initialHps = initialPoints.map((p) => p.hp);
     expect(initialHps.every((h) => h === POINT_HP)).toBe(true);
 
-    // 跑 30 秒足以让第一波怪攻击到第一层点位
-    runSeconds(state, 30);
+    // 跑足够长让第一波怪沿蜿蜒路径走到最近点位并开砍
+    runSeconds(state, 45);
 
     const finalPoints = Object.values(state.entities).filter(
       (e) => e.tower === 'princess',
